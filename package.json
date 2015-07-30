@@ -1,0 +1,10 @@
+{
+  "name": "map",
+  "title": "Map",
+  "description": "map",
+  "version": "0.0.1",
+  "dependencies": {
+    "jquery":"2.1.4",
+    "openlayers":"3.7.0"
+  }
+}
