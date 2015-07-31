@@ -105,15 +105,17 @@ $(document).ready(function() {
             }
             measureTooltipElement.innerHTML = output;
             measureTooltip.setPosition(tooltipCoord);
+
+            document.getElementById('btn-add').onclick = function() {
+
+
+            }
         }
 
         helpTooltipElement.innerHTML = helpMsg;
         helpTooltip.setPosition(evt.coordinate);
 
-        document.getElementById('btn-add').onclick = function() {
-           var vertices = getVertices(sketch);
-            alert()
-        }
+
     };
 
 
@@ -127,6 +129,14 @@ $(document).ready(function() {
     });
 
     map.on('pointermove', pointerMoveHandler);
+
+
+    function pointerClickHandler() {
+        console.log(sketch);
+        var coordinates = sketch.getGeometry().getCoordinates();
+        console.log(coordinates);
+    }
+
 
     var typeSelect = document.getElementById('type');
 
@@ -172,6 +182,7 @@ $(document).ready(function() {
             function (evt) {
                 measureTooltipElement.className = 'tooltip tooltip-static';
                 measureTooltip.setOffset([0, -7]);
+                pointerClickHandler();
                 // unset sketch
                 sketch = null;
                 // unset tooltip so that a new one can be created
@@ -269,6 +280,10 @@ $(document).ready(function() {
     };
 
     addInteraction();
+
+
+    /**get coordinates*/
+
 
 
 });
