@@ -89,8 +89,6 @@ $(document).ready(function() {
         /** @type {ol.Coordinate|undefined} */
         var tooltipCoord = evt.coordinate;
 
-
-
         if (sketch) {
             var output;
             var geom = (sketch.getGeometry());
@@ -105,38 +103,50 @@ $(document).ready(function() {
             }
             measureTooltipElement.innerHTML = output;
             measureTooltip.setPosition(tooltipCoord);
-
-            document.getElementById('btn-add').onclick = function() {
-
-
-            }
         }
 
         helpTooltipElement.innerHTML = helpMsg;
         helpTooltip.setPosition(evt.coordinate);
-
-
     };
 
 
+
+    var select = new ol.interaction.Select({
+        wrapX: false
+    });
+
+    var modify = new ol.interaction.Modify({
+        features: select.getFeatures()
+    });
+
     var map = new ol.Map({
+        interactions: ol.interaction.defaults().extend([select, modify]),
         layers: [raster, vector],
         target: 'map',
         view: new ol.View({
-            center: [5260000, 7585000],
+           center: [ 5260050.233181125, -4009506.140626508],
+            //cheb center: [5260000, 7585000],
             zoom: 14
         })
     });
 
+
     map.on('pointermove', pointerMoveHandler);
 
-
     function pointerClickHandler() {
-        console.log(sketch);
-        var coordinates = sketch.getGeometry().getCoordinates();
-        console.log(coordinates);
-    }
+        var sketch2 = sketch.clone();
+        console.log(sketch.getGeometry().getCoordinates());
+        sketch2.getGeometry().transform('EPSG:3857','EPSG:4326')
+        var coordinates = sketch2.getGeometry().getCoordinates();
+        var polygonName = $('#label-polygon').val();
 
+        var data = {
+            coordinates: coordinates,
+            name : polygonName
+        };
+        $.post('coordinate-data.php', data, function(data){console.log(data)});
+        delete sketch2;
+    }
 
     var typeSelect = document.getElementById('type');
 
@@ -189,9 +199,7 @@ $(document).ready(function() {
                 measureTooltipElement = null;
                 createMeasureTooltip();
             }, this);
-
-
-    }
+            }
 
     /**
      * Creates a new help tooltip
@@ -244,6 +252,8 @@ $(document).ready(function() {
      * @param {ol.geom.LineString} line
      * @return {string}
      */
+    var polygonLabel = document.getElementById('label-polygon').value;
+
     var formatLength = function (line) {
         var polygonLabel = document.getElementById('label-polygon').value;
         var length = Math.round(line.getLength() * 100) / 100;
@@ -281,9 +291,57 @@ $(document).ready(function() {
 
     addInteraction();
 
+    $.get('coordinate-data.php', function(data){
+        coordsObjs = JSON.parse(data);
+        for (var i in coordsObjs) {
+            //console.log(coordsObjs[i]['coordinates'][0]);
+            var savedPolygon = new ol.geom.Polygon(coordsObjs[i]['coordinates']);
+            var sphericalCoords = savedPolygon.transform('EPSG:4326', 'EPSG:3857');
 
-    /**get coordinates*/
+            var savedCoordinates = sphericalCoords.getCoordinates();
+            console.log(savedCoordinates);
+            savedPolygon.setCoordinates(savedCoordinates);
+
+            var savedPolygon = new ol.geom.Polygon(savedCoordinates);
+            // Create feature with polygon.
+            var feature = new ol.Feature(savedPolygon);
+
+            // Create vector source and the feature to it.
+            var vectorSource = new ol.source.Vector();
+
+            vectorSource.addFeature(feature);
+            // Create vector layer attached to the vector source.
+            var vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                type: /** @type {ol.geom.GeometryType} */ (type),
+                style: new ol.style.Style({
+                    fill: new ol.style.Fill({
+                        color: 'rgba(255, 255, 255, 0.2)'
+                    }),
+                    stroke: new ol.style.Stroke({
+                        color: '#0000ff',
+                        width: 2
+                    }),
+                    image: new ol.style.Circle({
+                        radius: 7,
+                        fill: new ol.style.Fill({
+                            color: '#0000ff'
+                        })
+                    })
+                })
+            });
+
+            // Add the vector layer to the map.
+            map.addLayer(vectorLayer);
+        };
 
 
+    })
 
+    /*
+    *0: 5259952.226857311 1: 7587049.467820894
+    *0: 5259952.226857311 1: -4009540.4461652297
+     */
+
+map.addInteraction
 });
