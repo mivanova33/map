@@ -1,41 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <title></title>
     <script src="node_modules/jquery/dist/jquery.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ol3/3.7.0/ol.css" type="text/css">
     <script src="node_modules/openlayers/dist/ol-debug.js"></script>
     <script src="map.js"></script>
-
-
 </head>
 <body>
-<div class="row-fluid container-fluid">
-    <div class="span12">
-        <div id="map" class="map"></div>
-    </div>
-</div>
+<div class="container-fluid">
 
-<div class="row-fluid">
-
-    <div class="span12">
-       <!-- <h4 id="title">Draw and modify features example</h4>
-        <p id="shortdesc">Example of using the ol.interaction.Draw interaction together with
-            the ol.interaction.Modify interaction.</p>
-        -->
+    <div class="row-fluid">
+        <div class="span12">
+            <div id="map" class="map"></div>
+        </div>
         <form class="form-inline">
             <label>Geometry type &nbsp;</label>
             <select id="type">
-                <option value="area">Area</option>
-                <option value="length">Length</option>
+                <option value="Polygon">Polygon</option>
+                <option value="LineString">LineString</option>
+                <option value="Point">Point</option>
             </select>
-            <input id="label-polygon" type="text"/>
         </form>
-
     </div>
-
-</div>
-
 </div>
 </body>
 </html>
+

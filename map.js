@@ -1,13 +1,21 @@
 $(document).ready(function() {
-
     var raster = new ol.layer.Tile({
         source: new ol.source.MapQuest({layer: 'osm'})
     });
 
-    var source = new ol.source.Vector();
+    var map = new ol.Map({
+        layers: [raster],
+        target: document.getElementById('map'),
+        //target: 'map',
+        view: new ol.View({
+            center: [5260000, 7585000],
+            zoom: 14
+        })
+    });
 
-    var vector = new ol.layer.Vector({
-        source: source,
+    var features = new ol.Collection();
+    var featureOverlay = new ol.layer.Vector({
+        source: new ol.source.Vector({features: features}),
         style: new ol.style.Style({
             fill: new ol.style.Fill({
                 color: 'rgba(255, 255, 255, 0.2)'
@@ -25,218 +33,98 @@ $(document).ready(function() {
         })
     });
 
-
-    /**
-     * Currently drawn feature.
-     * @type {ol.Feature}
-     */
-    var sketch;
-
-
-    /**
-     * The help tooltip element.
-     * @type {Element}
-     */
-    var helpTooltipElement;
-
-
-    /**
-     * Overlay to show the help messages.
-     * @type {ol.Overlay}
-     */
-    var helpTooltip;
-
-
-    /**
-     * The measure tooltip element.
-     * @type {Element}
-     */
-    var measureTooltipElement;
-
-
-    /**
-     * Overlay to show the measurement.
-     * @type {ol.Overlay}
-     */
-    var measureTooltip;
-
-
-    /**
-     * Message to show when the user is drawing a polygon.
-     * @type {string}
-     */
-    var continuePolygonMsg = 'Click to continue drawing the polygon';
-
-
-    /**
-     * Message to show when the user is drawing a line.
-     * @type {string}
-     */
-    var continueLineMsg = 'Click to continue drawing the line';
-
-
-    /**
-     * Handle pointer move.
-     * @param {ol.MapBrowserEvent} evt
-     */
-
-    var pointerMoveHandler = function (evt) {
-        if (evt.dragging) {
-            return;
-        }
-        /** @type {string} */
-        var helpMsg = 'Click to start drawing';
-        /** @type {ol.Coordinate|undefined} */
-        var tooltipCoord = evt.coordinate;
-
-        if (sketch) {
-            var output;
-            var geom = (sketch.getGeometry());
-            if (geom instanceof ol.geom.Polygon) {
-                output = formatArea(/** @type {ol.geom.Polygon} */ (geom));
-                helpMsg = continuePolygonMsg;
-                tooltipCoord = geom.getInteriorPoint().getCoordinates();
-            } else if (geom instanceof ol.geom.LineString) {
-                output = formatLength(/** @type {ol.geom.LineString} */ (geom));
-                helpMsg = continueLineMsg;
-                tooltipCoord = geom.getLastCoordinate();
-            }
-            measureTooltipElement.innerHTML = output;
-            measureTooltip.setPosition(tooltipCoord);
-        }
-
-        helpTooltipElement.innerHTML = helpMsg;
-        helpTooltip.setPosition(evt.coordinate);
-    };
-
-
-
-    var select = new ol.interaction.Select({
-        wrapX: false
-    });
+    featureOverlay.setMap(map);
+// Create vector source and the feature to it.
+    var vectorSource = new ol.source.Vector();
 
     var modify = new ol.interaction.Modify({
-        features: select.getFeatures()
+        features: features,
+        // the SHIFT key must be pressed to delete vertices, so
+        // that new vertices can be drawn at the same position
+        // of existing vertices
+        deleteCondition: function(event) {
+            return ol.events.condition.shiftKeyOnly(event) &&
+                ol.events.condition.singleClick(event);
+        }
     });
 
-    var map = new ol.Map({
-        interactions: ol.interaction.defaults().extend([select, modify]),
-        layers: [raster, vector],
-        target: 'map',
-        view: new ol.View({
-           center: [ 5260050.233181125, -4009506.140626508],
-            //cheb center: [5260000, 7585000],
-            zoom: 14
-        })
+    modify.on('modifyend',
+        function (evt) {
+            var modifiedFeatures = evt.features;
+            //console.log(modifiedFeatures);
+            modifiedFeatures.forEach(function(feature){
+                var modifiedCoords = feature.getGeometry().getCoordinates();
+                //console.log(modifiedCoords);
+                var polygonName = $('#label-polygon').val();
+                feature.getId();
+                console.log(feature);
+                //var data = {
+                //    coordinates: modifiedCoords,
+                //    name: polygonName
+                //    //id: polygonID
+                //};
+                //console.log(data);
+                //$.post('coordinate-data.php', data, function(data){console.log(data)});
+
+            });
+            //console.log(modifiedFeatures);
+        }
+    );
+
+    //mouse coordinates
+
+    var mousePositionControl = new ol.control.MousePosition({
+        coordinateFormat: ol.coordinate.createStringXY(4),
+        projection: 'EPSG:3857',
+        // comment the following two lines to have the mouse position
+        // be placed within the map.
+        className: 'custom-mouse-position',
+        target: document.getElementById('mouse-position'),
+        undefinedHTML: '&nbsp;'
     });
 
+    $(".custom-mouse-position").hide();
+    map.addControl(mousePositionControl);
 
-    map.on('pointermove', pointerMoveHandler);
+    var precisionInput = $('#precision');
+    precisionInput.on('change', function() {
+        var format = ol.coordinate.createStringXY(this.valueAsNumber);
+        mousePositionControl.setCoordinateFormat(format);
 
-    function pointerClickHandler() {
-        var sketch2 = sketch.clone();
-        console.log(sketch.getGeometry().getCoordinates());
-        sketch2.getGeometry().transform('EPSG:3857','EPSG:4326')
-        var coordinates = sketch2.getGeometry().getCoordinates();
-        var polygonName = $('#label-polygon').val();
-
-        var data = {
-            coordinates: coordinates,
-            name : polygonName
-        };
-        $.post('coordinate-data.php', data, function(data){console.log(data)});
-        delete sketch2;
-    }
-
-    var typeSelect = document.getElementById('type');
+    });
 
     var draw; // global so we can remove it later
-
-
     function addInteraction() {
-        var type = (typeSelect.value == 'area' ? 'Polygon' : 'LineString');
         draw = new ol.interaction.Draw({
-            source: source,
-            type: /** @type {ol.geom.GeometryType} */ (type),
-            style: new ol.style.Style({
-                fill: new ol.style.Fill({
-                    color: 'rgba(255, 255, 255, 0.2)'
-                }),
-                stroke: new ol.style.Stroke({
-                    color: 'rgba(0, 0, 0, 0.5)',
-                    lineDash: [10, 10],
-                    width: 2
-                }),
-                image: new ol.style.Circle({
-                    radius: 5,
-                    stroke: new ol.style.Stroke({
-                        color: 'rgba(0, 0, 0, 0.7)'
-                    }),
-                    fill: new ol.style.Fill({
-                        color: 'rgba(255, 255, 255, 0.2)'
-                    })
-                })
-            })
+            features: features,
+            type: (typeSelect.value)
         });
         map.addInteraction(draw);
-        createMeasureTooltip();
-
-        createHelpTooltip();
-        draw.on('drawstart',
-            function (evt) {
-                // set sketch
-                sketch = evt.feature;
-            }, this);
 
         draw.on('drawend',
             function (evt) {
-                measureTooltipElement.className = 'tooltip tooltip-static';
-                measureTooltip.setOffset([0, -7]);
-                pointerClickHandler();
-                // unset sketch
-                sketch = null;
-                // unset tooltip so that a new one can be created
-                measureTooltipElement = null;
-                createMeasureTooltip();
-            }, this);
-            }
 
-    /**
-     * Creates a new help tooltip
-     */
-    function createHelpTooltip() {
-        if (helpTooltipElement) {
-            helpTooltipElement.parentNode.removeChild(helpTooltipElement);
-        }
-        helpTooltipElement = document.createElement('div');
-        helpTooltipElement.className = 'tooltip';
-        helpTooltip = new ol.Overlay({
-            element: helpTooltipElement,
-            offset: [15, 0],
-            positioning: 'center-left'
-        });
-        map.addOverlay(helpTooltip);
+                //evt.feature.setId(123456);
+                //console.log(evt.feature);
+
+                var sketch = evt.feature.clone();
+                console.log(sketch);
+                //console.log(sketch.getGeometry().getCoordinates());
+                sketch.getGeometry().transform('EPSG:3857', 'EPSG:4326');
+                var coordinates = sketch.getGeometry().getCoordinates();
+                var polygonName = $('#label-polygon').val();
+                var data = {
+                    coordinates: coordinates,
+                    name: polygonName
+                    //id: polygonId
+                };
+                //console.log(data);
+                $.post('coordinate-data.php', data, function(data){console.log(data)});
+            });
+
     }
 
-
-    /**
-     * Creates a new measure tooltip
-     */
-    function createMeasureTooltip() {
-        if (measureTooltipElement) {
-            measureTooltipElement.parentNode.removeChild(measureTooltipElement);
-        }
-        measureTooltipElement = document.createElement('div');
-        measureTooltipElement.className = 'tooltip tooltip-measure';
-        measureTooltip = new ol.Overlay({
-            element: measureTooltipElement,
-            offset: [0, -15],
-            positioning: 'bottom-center'
-        });
-        map.addOverlay(measureTooltip);
-    }
-
-
+    var typeSelect = document.getElementById('type');
     /**
      * Let user change the geometry type.
      * @param {Event} e Change event.
@@ -246,74 +134,43 @@ $(document).ready(function() {
         addInteraction();
     };
 
-
-    /**
-     * format length output
-     * @param {ol.geom.LineString} line
-     * @return {string}
-     */
-    var polygonLabel = document.getElementById('label-polygon').value;
-
-    var formatLength = function (line) {
-        var polygonLabel = document.getElementById('label-polygon').value;
-        var length = Math.round(line.getLength() * 100) / 100;
-        var output;
-        if (length > 100) {
-            output = (Math.round(length / 1000 * 100) / 100) +
-                ' ' + 'km' + '<br>' + polygonLabel;
-        } else {
-            output = (Math.round(length * 100) / 100) +
-                ' ' + 'm' + '<br>' + polygonLabel;
-        }
-        return output;
-    };
-
-    /**
-     * format length output
-     * @param {ol.geom.Polygon} polygon
-     * @return {string}
-     */
-
-
-    var formatArea = function (polygon) {
-        var polygonLabel = document.getElementById('label-polygon').value;
-        var area = polygon.getArea();
-        var output;
-        if (area > 10000) {
-            output = (Math.round(area / 1000000 * 100) / 100) +
-                ' ' + 'km<sup>2</sup>' + '<br>' + polygonLabel;
-        } else {
-            output = (Math.round(area * 100) / 100) +
-                ' ' + 'm<sup>2</sup>' + '<br>' + polygonLabel;
-        }
-        return output;
-    };
-
     addInteraction();
+
+    $(this).keydown(function (e) {
+        if (e.keyCode == 27) { // escape key maps to keycode `27`
+            map.removeInteraction(draw);
+        }
+    });
+
+    $(this).keyup(function (e) {
+        if (e.keyCode == 27) { // escape key maps to keycode `27`
+            map.addInteraction(draw);
+        }
+    });
+
+    //console.log(vectorSource.getFeatures());
 
     $.get('coordinate-data.php', function(data){
         coordsObjs = JSON.parse(data);
         for (var i in coordsObjs) {
-            //console.log(coordsObjs[i]['coordinates'][0]);
-            var savedPolygon = new ol.geom.Polygon(coordsObjs[i]['coordinates']);
-            var sphericalCoords = savedPolygon.transform('EPSG:4326', 'EPSG:3857');
+            var flatCoords = [];
+            for(var j in coordsObjs[i]['coordinates'][0]){
 
-            var savedCoordinates = sphericalCoords.getCoordinates();
-            console.log(savedCoordinates);
-            savedPolygon.setCoordinates(savedCoordinates);
-
-            var savedPolygon = new ol.geom.Polygon(savedCoordinates);
+                var x = parseFloat(coordsObjs[i]['coordinates'][0][j][0]),
+                    y = parseFloat(coordsObjs[i]['coordinates'][0][j][1]),
+                    name = (coordsObjs[i]['name']);
+                    //console.log([x,y], name);
+                    flatCoords.push(ol.proj.transform([x,y],'EPSG:4326', 'EPSG:3857'));
+            }
+            var savedPolygon = new ol.geom.Polygon([flatCoords]);
+            //console.log(savedPolygon);
             // Create feature with polygon.
             var feature = new ol.Feature(savedPolygon);
 
-            // Create vector source and the feature to it.
-            var vectorSource = new ol.source.Vector();
-
-            vectorSource.addFeature(feature);
-            // Create vector layer attached to the vector source.
             var vectorLayer = new ol.layer.Vector({
+                // Create vector layer attached to the vector source.
                 source: vectorSource,
-                type: /** @type {ol.geom.GeometryType} */ (type),
+                type: /** @type {ol.geom.GeometryType} */ (typeSelect.value),
                 style: new ol.style.Style({
                     fill: new ol.style.Fill({
                         color: 'rgba(255, 255, 255, 0.2)'
@@ -330,18 +187,135 @@ $(document).ready(function() {
                     })
                 })
             });
+            vectorSource.addFeature(feature);
 
-            // Add the vector layer to the map.
+           // Add the vector layer to the map.
             map.addLayer(vectorLayer);
+            map.addInteraction(modify);
+    //var  poly = {'id':'1234124','coordinates':[[47,56]]}
+        }
+
+        //closest point
+
+
+        var newCoords =[];
+        var point = null;
+        var line = null;
+        var displaySnap = function() {
+            map.on('pointermove', function(evt) {
+
+                var divValue = $(".custom-mouse-position").text();
+                var mouseCoords = (divValue.split(','));
+                for(var i in mouseCoords){
+                    mouseCoords[i] = parseInt(mouseCoords[i]);
+                }
+                var closestFeature = vectorSource.getClosestFeatureToCoordinate(mouseCoords);
+                var closestPoint = closestFeature.getGeometry().getClosestPoint(mouseCoords);
+                point = new ol.geom.Point(closestPoint);
+                point.setCoordinates(closestPoint);
+                line = new ol.geom.LineString([mouseCoords, closestPoint]);
+                line.setCoordinates([mouseCoords, closestPoint]);
+                map.render();
+                //newCoords.push(mouseCoords);
+                //newCoords.push(closestPoint)
+            });
+
+
+            //var newPolygon = new ol.geom.Polygon(newCoords);
+            //console.log();
+
         };
 
+        vectorSource.forEachFeature(function(feature){
+            var featCoords = feature.getGeometry().getCoordinates();
+            console.log(feature)
+        });
 
-    })
+        map.on('pointermove', function(evt) {
+            if (evt.dragging) {
+                return;
+            }
+            var coordinate = map.getEventCoordinate(evt.originalEvent);
+            displaySnap(coordinate);
+        });
 
-    /*
-    *0: 5259952.226857311 1: 7587049.467820894
-    *0: 5259952.226857311 1: -4009540.4461652297
-     */
+        map.on('click', function(evt) {
+            displaySnap(evt.coordinate);
+        });
 
-map.addInteraction
+        var imageStyle = new ol.style.Circle({
+            radius: 10,
+            fill: null,
+            stroke: new ol.style.Stroke({
+                color: 'rgba(255,255,0,0.9)',
+                width: 3
+            })
+        });
+        var strokeStyle = new ol.style.Stroke({
+            color: 'rgba(255,255,0,0.9)',
+            width: 3
+        });
+        map.on('postcompose', function(evt) {
+            var vectorContext = evt.vectorContext;
+            if (point !== null) {
+                vectorContext.setImageStyle(imageStyle);
+                vectorContext.drawPointGeometry(point);
+            }
+            if (line !== null) {
+                vectorContext.setFillStrokeStyle(null, strokeStyle);
+                vectorContext.drawLineStringGeometry(line);
+                modify.setActive(line);
+            }
+        });
+
+        map.on('pointermove', function(evt) {
+            if (evt.dragging) {
+                return;
+            }
+            var pixel = map.getEventPixel(evt.originalEvent);
+            var hit = map.hasFeatureAtPixel(pixel);
+            if (hit) {
+                map.getTarget().style.cursor = 'pointer';
+            } else {
+                map.getTarget().style.cursor = '';
+
+            }
+        });
+    });
+
+
+
 });
+/*
+ // a normal select interaction to handle click
+ var select = new ol.interaction.Select();
+ var select = new ol.interaction.Select();
+ map.addInteraction(select);
+
+
+saving polygons after modifying
+ button add
+ button modify drawn
+ drawing inside polygon is not allowed
+ modifying savedPolygon
+ http://vasir.net/blog/openlayers/openlayers-tutorial-part-3-controls
+ http://openlayersbook.github.io/ch11-creating-web-map-apps/example-05.html
+ randomize ids with math.rand
+
+
+ Ok...I answer my own question. I basically needed:
+ 1.- Create a panel to add buttons in it
+ var panel = new OpenLayers.Control.Panel({defaultControl: btnHiLite});
+ 2.- Add the button to the panel
+ panel.addControls([btnHiLite]);
+ 3.- Add the panel to the map
+ map = new OpenLayers.Map( 'map', {
+ controls: [
+ new OpenLayers.Control.PanZoom(),
+ panel]
+ });
+
+
+
+;*/
+
